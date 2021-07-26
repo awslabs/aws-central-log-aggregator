@@ -1,0 +1,45 @@
+{
+  "config_json": {
+    "logaggregator": {
+      "source": {
+        "configoptions": {
+          "sourcetype": "storage",
+          "mode": "stream",
+          "loggroup": "emr",
+          "pattern":"(\\d{2}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}) (INFO|ERROR|WARN|TRACE|DEBUG|FATAL)\\s+(.*?)(?=\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3}|\\Z)",
+          "location": "${LogSource}",
+          "logformat": "text",
+          "checkpointlocation": "/tmp/emr/checkpoint"
+        },
+        "sparkoptions": {
+        }
+      },
+      "destination": [
+        {
+          "configoptions": {
+            "destinationtype": "elasticsearch",
+            "resource": "emr/_doc",
+            "mode": "append"
+          },
+          "sparkoptions": {
+            "es.nodes": "${LogESDestination}",
+            "es.net.http.auth.pass": "${ESPassword}",
+            "es.net.http.auth.user": "${ESUsername}",
+            "es.port": 443,
+            "es.net.ssl": "true",
+            "es.write.rest.error.handlers": "es",
+            "es.nodes.wan.only": "true",
+            "es.write.rest.error.handler.es.client.resource": "emr-failed/_doc"
+          }
+        }
+      ],
+      "engineconfiguration": {},
+      "errorhandler": {},
+      "postprocessing": {}
+    }
+  },
+  "source_name": "emr_logs",
+  "source_type": "stream",
+  "spark_submit_args": "--deploy-mode client --executor-memory 1g --executor-cores 1 --num-executors 1 --driver-memory 1g --conf spark.driver.memoryOverhead=1024 --conf spark.executor.memoryOverhead=1024 --jars s3://${SourceCodeBucket}/${SourceCodePrefix}/dependencies/*.jar --class com.aws.logaggregator.LogAggregatorMainApplication s3://${SourceCodeBucket}/${SourceCodePrefix}/app/aws-logaggregator-v1.jar"
+
+}

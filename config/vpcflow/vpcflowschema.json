@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "schema": {
+    "loggroup": "vpcflow",
+    "deriveby": "index",
+    "attributes": [
+      {
+        "name": "version",
+        "type": "integer",
+        "index": 0
+      },
+      {
+        "name": "account_id",
+        "type": "String",
+        "index": 1
+      },
+      {
+        "name": "interface_id",
+        "type": "String",
+        "index": 2
+      },
+      {
+        "name": "srcaddr",
+        "type": "String",
+        "index": 3
+      },
+      {
+        "name": "dstaddr",
+        "type": "String",
+        "index": 4
+      },
+      {
+        "name": "srcport",
+        "type": "integer",
+        "index": 5
+      },
+      {
+        "name": "dstport",
+        "type": "integer",
+        "index": 6
+      },
+      {
+        "name": "protocol",
+        "type": "integer",
+        "index": 7
+      },
+      {
+        "name": "packets",
+        "type": "integer",
+        "index": 8
+      },
+      {
+        "name": "bytes",
+        "type": "integer",
+        "index": 9
+      },{
+        "name": "start",
+        "type": "string",
+        "index": 10
+      },
+      {
+        "name": "end",
+        "type": "string",
+        "index": 11
+      },
+      {
+        "name": "action",
+        "type": "String",
+        "index": 12
+      },
+      {
+        "name": "log_status",
+        "type": "String",
+        "index": 13
+      },
+      {
+        "name": "vpc_id",
+        "type": "String",
+        "index": 14
+      },{
+        "name": "subnet_id",
+        "type": "integer",
+        "index": 15
+      },
+      {
+        "name": "instance_id",
+        "type": "String",
+        "index": 16
+      },
+      {
+        "name": "tcp_flags",
+        "type": "String",
+        "index": 17
+      },
+      {
+        "name": "type",
+        "type": "String",
+        "index": 18
+      },
+      {
+        "name": "pkt_srcaddr",
+        "type": "String",
+        "index": 19
+      },
+      {
+        "name": "pkt_dstaddr",
+        "type": "String",
+        "index": 20
+      },
+      {
+        "name": "region",
+        "type": "String",
+        "index": 21
+      },
+      {
+        "name": "az-id",
+        "type": "String",
+        "index": 22
+      },
+      {
+        "name": "sublocation_type",
+        "type": "String",
+        "index": 23
+      },
+      {
+        "name": "sublocation_id",
+        "type": "String",
+        "index": 24
+      }
+      
+    ]
+  }
+}

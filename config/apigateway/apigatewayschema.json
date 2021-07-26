@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "schema": {
+    "loggroup": "apigateway",
+    "deriveby": "index",
+    "attributes": [
+      {
+        "name": "message",
+        "mandatory": false,
+        "type": "String",
+        "index": 0
+      }
+    ]
+  }
+}

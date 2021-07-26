@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "schema": 
+    {
+        "loggroup":"emr",
+        "deriveby":"index",
+        "attributes": [
+            {
+            "name": "timestamp",
+            "mandatory": false,
+            "type": "String",
+            "index":0
+            },
+            {
+            "name": "level",
+            "mandatory": false,
+            "type": "String",
+            "index":1
+            },
+            {
+            "name": "message",
+            "mandatory": false,
+            "type": "String",
+            "index":2
+            }
+          ]
+    } 
+    
+}
