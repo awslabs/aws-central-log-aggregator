@@ -1,0 +1,201 @@
+#**
+# Access Kibana from private subnet.
+#
+# @author Iftik
+#**
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create an Amazon Linux server running nginx web server
+Parameters:
+  KeyName:
+    Type: String
+    Description: Name instance
+    Default: Name
+  ESDomin:
+    Type: String
+    Description: ES Domain
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet
+  LogVPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Log VPC
+
+  AMI:
+    Description: AMI ID
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+  NGINXInstanceType:
+    Description: The Instance Type for the NGINX Proxy.
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+Resources:
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !Ref AMI
+      InstanceType: !Ref NGINXInstanceType
+      IamInstanceProfile: !Ref NGINXClusterinstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - Ref: "NGINXSecurityGroup"
+          SubnetId: !Ref "SubnetId"
+      Tags:
+        - Key: !Ref KeyName
+          Value: Amazon Linux nginx included
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y aws-cfn-bootstrap cloud-init aws-cli
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region} --configsets bootstrap_install
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          bootstrap_install:
+            - config_cfn
+            - prepare_nginx
+            - configure_nginx
+            - start_nginx
+        config_cfn:
+          files:
+            "/etc/cfn/cfn-hup.conf":
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+              mode: '000400'
+              owner: root
+              group: root
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.EC2Instance.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region} --configsets bootstrap_install
+                runas=root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+        prepare_nginx:
+          commands:
+            install_nginx-0:
+              command: "sudo amazon-linux-extras install nginx1.12"
+            install_nginx-2:
+              command: 'sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/cert.key -out /etc/nginx/cert.crt -subj "/C=DE"'
+        configure_nginx:
+          files:
+            "/etc/nginx/conf.d/default.conf":
+              content: !Sub |
+                server {
+                    listen 443;
+                    server_name $host;
+                    rewrite ^/$ https://$host/_plugin/kibana redirect;
+
+                    ssl_certificate           /etc/nginx/cert.crt;
+                    ssl_certificate_key       /etc/nginx/cert.key;
+
+                    ssl on;
+                    ssl_session_cache  builtin:1000  shared:SSL:10m;
+                    ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;
+                    ssl_ciphers HIGH:!aNULL:!eNULL:!EXPORT:!CAMELLIA:!DES:!MD5:!PSK:!RC4;
+                    ssl_prefer_server_ciphers on;
+                    gzip  on;
+                    gzip_proxied any;
+                    gzip_types text/plain application/javascript application/x-javascript text/javascript text/xml text/css;
+
+                    location ^~ /_plugin/kibana {
+                        # Forward requests to Kibana
+                        proxy_pass https://${ESDomin}/_plugin/kibana;
+
+                        # Update cookie domain and path
+                        proxy_cookie_domain https://${ESDomin} https://$host;
+
+                        proxy_set_header Accept-Encoding "";
+                        sub_filter_types *;
+                        sub_filter https://${ESDomin} https://$host;
+                        sub_filter_once off;
+
+                        # Response buffer settings
+                        proxy_buffer_size 128k;
+                        proxy_buffers 4 256k;
+                        proxy_busy_buffers_size 256k;
+                    }
+                }
+        start_nginx:
+          commands:
+            start_nginx-0:
+              command: "sudo systemctl restart nginx.service"
+
+  NGINXClusterinstanceProfileRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource: '*'
+
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+  NGINXClusterinstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref NGINXClusterinstanceProfileRole
+
+    # Elasticsearch
+  NGINXSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allows HTTP
+      VpcId:
+        Ref: LogVPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          FromPort: 443
+          ToPort: 443
+          IpProtocol: tcp
+
+Outputs:
+  KibanaURL:
+    Description: URL for Kibana page
+    Value: !Sub 'https://${EC2Instance.PublicDnsName}/_plugin/kibana'

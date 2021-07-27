@@ -1,0 +1,761 @@
+#**
+# AWS Log Aggregator Primary Stack .
+#
+# @author Iftik
+#**
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Log Aggregator Solution, primary template (Version v0.0.1)'
+Parameters:
+  LogType:
+    Description: Choose log type for demo.
+    Type: String
+    Default: CloudTrail
+    AllowedValues:
+      - CloudTrail
+      - VPCFlowLog
+      - CloudFront
+      - Lambda
+      - ApiGateway
+  LogSourceType:
+    Type: String
+    Description: Enter Logs source type like S3, cloudwatch or Kinesis.
+    Default: ""
+    AllowedValues:
+      - ""
+      - S3
+      - CloudWatch
+      - Kinesis
+  LogSource:
+    Description: >-
+      Log source are based on LogSourceType i.e S3 path, CloudWatch loggroup name or Kinesis stream name.
+    Type: String
+  ConfigTableName:
+    Description: Job Config Table Name
+    Type: String
+    Default: jobconfig
+  EMRClusterName:
+    Description: EMR Cluster Name
+    Type: String
+    Default: LogAggregator
+  MasterInstanceType:
+    Description: Instance type for the EMR master instance.
+    Type: String
+    Default: m4.large
+  CoreInstanceType:
+    Description: Instance type for EMR core instances.
+    Type: String
+    Default: m4.large
+  NumberOfCoreInstances:
+    Description: No of EMR core intances.
+    ConstraintDescription: Must be a valid number.
+    Type: Number
+    Default: 2
+  ReleaseLabel:
+    Description: Must be a valid EMR release version.
+    Default: emr-5.30.1
+    Type: String
+  SourceCodeBucket:
+    Description: Valid EMR Application code bucket name.
+    Default: awslogaggregator-logaccount
+    Type: String
+  Version:
+    Description: Choose latest version of Log Aggregator
+    Type: String
+    Default: v0.0.1
+    AllowedValues:
+      - v0.0.1
+  ESDomainName:
+    Description: >-
+      Name for the Amazon ES domain that this template will create. Domain names
+      must start with a lowercase letter and must be between 3 and 28
+      characters. Valid characters are a-z (lowercase only), 0-9.
+    Type: String
+    Default: logaggregator
+
+  ESSecretName:
+    Type: String
+    Description: Secrets Name.
+    Default: "logaggregator/es/cred"
+
+  AdminEmail:
+    Type: String
+    AllowedPattern: >-
+      ^[_A-Za-z0-9-\+\.]+(\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9]+)*(\.[A-Za-z]{2,})$
+    Description: Admin Email for Alerts and Monitering.
+    Default: xyz@amazon.com
+  ClusterSize:
+    Description: >-
+      Amazon ES cluster size; small (4 data nodes), medium (6 data nodes), large
+      (6 data nodes)
+    Type: String
+    Default: Small
+    AllowedValues:
+      - Small
+      - Medium
+      - Large
+  SampleLogs:
+    Description: Deploy template for sample logs?
+    Type: String
+    Default: 'Yes'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  EnabledUltraWarm:
+    Description: Enable ultawarm for Elastic search?
+    Type: String
+    Default: 'Yes'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  HotIndexAgeLimit:
+    Description: No of days an Index will remain Hot
+    Type: Number
+    Default: 30
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.1.0.0/16
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.1.10.0/24
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.1.20.0/24
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.1.50.0/24
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.1.60.0/24
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VpcCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+      - Label:
+          default: Log Aggregator Solution
+        Parameters:
+          - Version
+          - SourceCodeBucket
+      - Label:
+          default: EMR Configuration
+        Parameters:
+          - EMRClusterName
+          - MasterInstanceType
+          - CoreInstanceType
+          - NumberOfCoreInstances
+          - ReleaseLabel
+      - Label:
+          default: Elasticsearch Configuration
+        Parameters:
+          - ESDomainName
+          - AdminEmail
+          - ClusterSize
+      - Label:
+          default: Configuration
+        Parameters:
+          - ConfigTableName
+          - ESSecretName
+      - Label:
+          default: Deploy sample logs?
+        Parameters:
+          - SampleLogs
+          - LogType
+          - LogSourceType
+          - LogSource
+      - Label:
+          default: Ultrawarm setup for ELasticSearch?
+        Parameters:
+          - EnabledUltraWarm
+          - HotIndexAgeLimit
+    ParameterLabels:
+      AdminEmail:
+        default: Admin email address for alerts and Kibana dashbaird access.
+      ESDomainName:
+        default: Elasticsearch Domain name.
+      ClusterSize:
+        default: Cluster Size.
+      EnabledUltraWarm:
+        default: Enable UltraWarm for Elastic Search.
+      HotIndexAgeLimit:
+        default: Age Limit of hot Index in number of days.
+      ESSecretName:
+        default: ElasticSearch Secret name.
+      VpcCIDR:
+        Default: 10.1.0.0/16
+      PublicSubnet1CIDR:
+        Default: 10.1.10.0/24
+      PublicSubnet2CIDR:
+        Default: 10.1.20.0/24
+      PrivateSubnet1CIDR:
+        Default: 10.1.50.0/24
+      PrivateSubnet2CIDR:
+        Default: 10.1.60.0/24
+
+
+Mappings:
+  InstanceMap:
+    send-data:
+      SendAnonymousData: 'Yes'
+  ElasticSearch:
+    Parameters:
+      Version: '7.9'
+    NodeCount:
+      Small: '4'
+      Medium: '6'
+      Large: '6'
+    MasterSize:
+      Small: c5.large.elasticsearch
+      Medium: c5.large.elasticsearch
+      Large: c5.large.elasticsearch
+    InstanceSize:
+      Small: i3.large.elasticsearch
+      Medium: i3.2xlarge.elasticsearch
+      Large: i3.4xlarge.elasticsearch
+Conditions:
+  DemoData: !Equals
+    - !Ref SampleLogs
+    - 'Yes'
+  IsUltraWarmEnabled: !Equals
+    - !Ref EnabledUltraWarm
+    - 'Yes'
+Resources:
+  VPCStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: !Sub >-
+        https://s3.amazonaws.com/${SourceCodeBucket}/${Version}/template/log-aggregator-vpc.yaml
+      Parameters:
+        VpcCIDR:
+          Ref: VpcCIDR
+        PublicSubnet1CIDR:
+          Ref: PublicSubnet1CIDR
+        PublicSubnet2CIDR:
+          Ref: PublicSubnet2CIDR
+        PrivateSubnet1CIDR:
+          Ref: PrivateSubnet1CIDR
+        PrivateSubnet2CIDR:
+          Ref: PrivateSubnet2CIDR
+  NGINXStack:
+    DependsOn:
+      - ElasticsearchAWSLogs
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        ESDomin: !Sub '${ElasticsearchAWSLogs.DomainEndpoint}'
+        SubnetId: !GetAtt VPCStack.Outputs.PublicSubnetA
+        LogVPC: !GetAtt VPCStack.Outputs.VPC
+      TemplateURL: !Sub >-
+        https://s3.amazonaws.com/${SourceCodeBucket}/${Version}/template/log-aggregator-nginx.yaml
+  ESSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: !Ref ESSecretName
+      Description: This is my ES secret
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: password
+        PasswordLength: 16
+        ExcludeCharacters: '"${|@/\'
+
+  EMRCluster:
+    DependsOn:
+      - EMRClusterServiceRole
+      - EMRClusterinstanceProfileRole
+      - EMRClusterinstanceProfile
+      - ESSecret
+      - VPCStack
+    Type: 'AWS::EMR::Cluster'
+    Properties:
+      BootstrapActions:
+        - Name: bootstrap action
+          ScriptBootstrapAction:
+            Path: !Sub 's3://${SourceCodeBucket}/${Version}/bootstrap/bootstrap.sh'
+      Applications:
+        - Name: Spark
+      LogUri: !Sub 's3://${SourceCodeBucket}/EMRLogs'
+      Instances:
+        Ec2SubnetId: !GetAtt VPCStack.Outputs.PrivateSubnetA
+        EmrManagedMasterSecurityGroup: !GetAtt VPCStack.Outputs.ElasticMapReduceMasterPrivate
+        EmrManagedSlaveSecurityGroup: !GetAtt VPCStack.Outputs.ElasticMapReduceSlavePrivate
+        ServiceAccessSecurityGroup: !GetAtt VPCStack.Outputs.ElasticMapReduceServiceAccess
+        MasterInstanceGroup:
+          InstanceCount: 1
+          InstanceType: !Ref MasterInstanceType
+          Market: ON_DEMAND
+          Name: Master
+        CoreInstanceGroup:
+          InstanceCount: !Ref NumberOfCoreInstances
+          InstanceType: !Ref CoreInstanceType
+          Market: ON_DEMAND
+          Name: Core
+        TerminationProtected: false
+      VisibleToAllUsers: true
+      StepConcurrencyLevel: 10
+      JobFlowRole: !Ref EMRClusterinstanceProfile
+      ReleaseLabel: !Ref ReleaseLabel
+      Name: !Sub '${EMRClusterName}${AWS::StackName}'
+      AutoScalingRole: EMR_AutoScaling_DefaultRole
+      ServiceRole: !Ref EMRClusterServiceRole
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+  EMRClusterServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - elasticmapreduce.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole'
+      Path: /
+  EMRClusterinstanceProfileRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role'
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'es:ESHttp*'
+                Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:ListSecretVersionIds'
+                  - 'secretsmanager:DescribeSecret'
+                  - 'secretsmanager:GetResourcePolicy'
+                  - 'secretsmanager:GetSecretValue'
+                  - 'secretsmanager:ListSecrets'
+                Resource: !Ref ESSecret
+              - Effect: Allow
+                Action:
+                  - 'kinesis:SubscribeToShard'
+                  - 'kinesis:DescribeStreamSummary'
+                  - 'kinesis:DescribeStreamConsumer'
+                  - 'kinesis:GetShardIterator'
+                  - 'kinesis:GetRecords'
+                  - 'kinesis:DescribeStream'
+                  - 'kinesis:ListTagsForStream'
+                  - 'kinesis:ListShards'
+                Resource:
+                  - !Sub >-
+                    arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:*/*/consumer/*:*
+                  - !Sub >-
+                    arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/*
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+  EMRClusterinstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EMRClusterinstanceProfileRole
+
+    # Elasticsearch
+
+  ElasticsearchServiceLinkedRole:
+    Type: 'AWS::IAM::ServiceLinkedRole'
+    Properties:
+      AWSServiceName: es.amazonaws.com
+
+  ElasticsearchAWSLogs:
+    Type: 'AWS::Elasticsearch::Domain'
+    #    DeletionPolicy: Retain
+    DependsOn:
+      - VPCStack
+      - ElasticsearchServiceLinkedRole
+    Properties:
+      DomainName: !Ref ESDomainName
+      ElasticsearchVersion: !FindInMap
+        - ElasticSearch
+        - Parameters
+        - Version
+      EncryptionAtRestOptions:
+        Enabled: true
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+      AdvancedSecurityOptions:
+        Enabled: true
+        InternalUserDatabaseEnabled: true
+        MasterUserOptions:
+          MasterUserName: !Sub '{{resolve:secretsmanager:${ESSecret}::username}}'
+          MasterUserPassword: !Sub '{{resolve:secretsmanager:${ESSecret}::password}}'
+      DomainEndpointOptions:
+        EnforceHTTPS: true
+      ElasticsearchClusterConfig:
+        DedicatedMasterEnabled: true
+        InstanceCount: !FindInMap
+          - ElasticSearch
+          - NodeCount
+          - !Ref ClusterSize
+        ZoneAwarenessEnabled: true
+        InstanceType: !FindInMap
+          - ElasticSearch
+          - InstanceSize
+          - !Ref ClusterSize
+        DedicatedMasterType: !FindInMap
+          - ElasticSearch
+          - MasterSize
+          - !Ref ClusterSize
+        DedicatedMasterCount: 3
+      AccessPolicies:
+        Version: 2012-10-17
+        Statement:
+          - Action: 'es:ESHttp*'
+            Principal: '*'
+            Effect: Allow
+            Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${ESDomainName}/*'
+      AdvancedOptions:
+        rest.action.multi.allow_explicit_index: 'true'
+        indices.fielddata.cache.size: 40
+      VPCOptions:
+        SubnetIds:
+          - !GetAtt VPCStack.Outputs.PrivateSubnetA
+          - !GetAtt VPCStack.Outputs.PrivateSubnetB
+        SecurityGroupIds:
+          - !GetAtt VPCStack.Outputs.SecurityGroup
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+  AggregatorLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Description: Log Aggregator - Lambda solution helper functions
+      FunctionName: LogAggregatorLambda
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+      Handler: index.handler
+      Runtime: python3.8
+      Timeout: 600
+      Role: !GetAtt
+        - AggregatorLambdaRole
+        - Arn
+      Code:
+        S3Bucket: !Ref SourceCodeBucket
+        S3Key: !Sub '${Version}/lambda/lambda.zip'
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+  AggregatorLambdaRole:
+    Type: 'AWS::IAM::Role'
+    DependsOn: ElasticsearchAWSLogs
+    Properties:
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'es:UpdateElasticsearchDomainConfig'
+                Resource: !Sub >-
+                  arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${ESDomainName}
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:ListStreams'
+                  - 'dynamodb:GetRecords'
+                  - 'dynamodb:ListShards'
+                  - 'dynamodb:GetShardIterator'
+                  - 'dynamodb:DescribeStream'
+                  - 'dynamodb:PutItem'
+                Resource:
+                  - !Sub >-
+                    arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ConfigTableName}
+                  - !Sub >-
+                    arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ConfigTableName}/*
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:ListSecretVersionIds'
+                  - 'secretsmanager:DescribeSecret'
+                  - 'secretsmanager:GetResourcePolicy'
+                  - 'secretsmanager:GetSecretValue'
+                  - 'secretsmanager:ListSecrets'
+                Resource: !Ref ESSecret
+              - Effect: Allow
+                Action:
+                  - 'elasticmapreduce:ModifyCluster'
+                  - 'elasticmapreduce:DescribeCluster'
+                  - 'elasticmapreduce:SetTerminationProtection'
+                  - 'elasticmapreduce:DescribeStep'
+                  - 'elasticmapreduce:AddJobFlowSteps'
+                  - 'elasticmapreduce:RunJobFlow'
+                  - 'elasticmapreduce:CancelSteps'
+                  - 'elasticmapreduce:ListSteps'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'SNS:Publish'
+                Resource: !Ref Topic
+              - Effect: Allow
+                Action:
+                  - 'iam:CreateServiceLinkedRole'
+                Resource: >-
+                  arn:*:iam::*:role/aws-service-role/es.amazonaws.com/AWSServiceRoleForAmazonElasticsearchService*
+  Topic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+      DisplayName: Log Aggregator CloudWatch alarms notification topic
+  TopicPolicy:
+    Type: 'AWS::SNS::TopicPolicy'
+    Properties:
+      PolicyDocument:
+        Id: Id1
+        Version: 2012-10-17
+        Statement:
+          - Sid: Sid1
+            Effect: Allow
+            Principal:
+              AWS: !Sub '${AWS::AccountId}'
+            Action: 'sns:Publish'
+            Resource: '*'
+      Topics:
+        - !Ref Topic
+  TopicEndpointSubscription:
+    DependsOn: TopicPolicy
+    Type: 'AWS::SNS::Subscription'
+    Properties:
+      Endpoint: !Ref AdminEmail
+      Protocol: email
+      TopicArn: !Ref Topic
+  #
+  # UltraWarm for elastic search
+  #
+  UltrawarmLambda:
+    Type: 'AWS::Lambda::Function'
+    Condition: IsUltraWarmEnabled
+    Properties:
+      Description: Log Aggregator - ES Ultrawarm
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+          HOT_INDEX_AGE_LIMIT: !Ref HotIndexAgeLimit
+          ELASTICSEARCH_ENDPOINT: !Sub '${ElasticsearchAWSLogs.DomainEndpoint}'
+          REGION: !Ref 'AWS::Region'
+          SSM_PATH: !Ref ESSecretName
+      Handler: ultrawarm.lambda_handler
+      Runtime: python3.8
+      Timeout: 600
+      Role: !GetAtt
+        - AggregatorLambdaRole
+        - Arn
+      Code:
+        S3Bucket: !Ref SourceCodeBucket
+        S3Key: !Sub '${Version}/lambda/lambda.zip'
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+
+  UltrawarmEventsRule:
+    Condition: IsUltraWarmEnabled
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: ES Ultrawarm Event
+      State: ENABLED
+      ScheduleExpression: "cron(15 12 * * ? *)"
+      Targets:
+        - Id: 'UltrawarmTargetId'
+          Arn: !Sub '${UltrawarmLambda.Arn}'
+
+  PermissionForEventsToInvokeLambda:
+    Condition: IsUltraWarmEnabled
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UltrawarmLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !Sub '${UltrawarmEventsRule.Arn}'
+  #
+  # CloudWatch Alarms
+  #
+  FreeStorageSpaceTooLowAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+        - !Ref Topic
+      AlarmDescription: Cluster has less than 2GB of storage space.
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+        - Name: ClientId
+          Value: !Ref 'AWS::AccountId'
+        - Name: DomainName
+          Value: !Ref ESDomainName
+      EvaluationPeriods: 1
+      MetricName: FreeStorageSpace
+      Namespace: AWS/ES
+      OKActions:
+        - !Ref Topic
+      Period: 60
+      Statistic: Minimum
+      Threshold: 2000
+  DemoStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Condition: DemoData
+    DependsOn:
+      - EMRCluster
+      - AggregatorLambda
+      - DynamoDBTableStream
+      - NGINXStack
+    Properties:
+      Parameters:
+        ConfigTable: !Ref JobConfigTable
+        EMRClusterId: !Ref EMRCluster
+        #      LogS3Destination: !Ref LogS3Destination
+        LogESDestination: !Sub '${ElasticsearchAWSLogs.DomainEndpoint}'
+        SourceCodeBucket: !Ref SourceCodeBucket
+        SourceCodePrefix: !Ref Version
+        LogType: !Ref LogType
+        LogSource: !Ref LogSource
+        LogSourceType: !Ref LogSourceType
+        ESSecretName: !Ref ESSecretName
+        RegionName: !Ref 'AWS::Region'
+        Topic: !Ref Topic
+      TemplateURL: !Sub >-
+        https://s3.amazonaws.com/${SourceCodeBucket}/${Version}/template/log-aggregator-secondary.yaml
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+
+  # DynamoDB
+  JobConfigTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: source_name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: source_name
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      TableName: !Ref ConfigTableName
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+  DynamoDBTableStream:
+    Type: 'AWS::Lambda::EventSourceMapping'
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn: !GetAtt
+        - JobConfigTable
+        - StreamArn
+      FunctionName: !GetAtt
+        - AggregatorLambda
+        - Arn
+      StartingPosition: LATEST
+
+  AWSLogAggregatorKibanaDashboard:
+    Type: 'Custom::SendSecrets'
+    Version: 1
+    Properties:
+      ServiceToken: !Sub "${AggregatorLambda.Arn}"
+      ESSecretName: !Ref ESSecretName
+      RegionName: !Ref 'AWS::Region'
+      Topic: !Ref Topic
+      KibanaURL: !GetAtt NGINXStack.Outputs.KibanaURL
+Outputs:
+  DomainEndpoint:
+    Description: ES domain endpoint URL
+    Value: !Sub '${ElasticsearchAWSLogs.DomainEndpoint}'
+  KibanaLoginURL:
+    Description: Kibana login URL
+    Value: !GetAtt NGINXStack.Outputs.KibanaURL
+  ConfigTable:
+    Description: JobConfigTable
+    Value: !Sub '${JobConfigTable}'
+  ClusterId:
+    Description: ClusterId
+    Value: !Ref EMRCluster
+  SourceCodeBucket:
+    Description: SourceCodeBucket
+    Value: !Ref SourceCodeBucket
+  SourceCodePrefix:
+    Description: SourceCodePrefix
+    Value: !Ref Version
+  RegionName:
+    Description: RegionName
+    Value: !Ref 'AWS::Region'
+  Topic:
+    Description: Topic
+    Value: !Ref Topic

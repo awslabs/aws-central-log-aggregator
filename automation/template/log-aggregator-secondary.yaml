@@ -1,0 +1,168 @@
+#**
+# AWS Log Aggregator Secondary Stack.
+#
+# @author Iftik
+#**
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Log Aggregator Stack.
+Parameters:
+
+  LogSource:
+    Type: String
+    Description: >-
+      Choose log source like S3 path, kinesis stream name(Demo stack support
+      only S3 paths, for streaming logs contact dev team).
+
+  LogType:
+    Type: String
+    Default: CloudTrail
+    AllowedValues:
+      - CloudTrail
+      - VPCFlowLog
+      - CloudFront
+      - Lambda
+      - ApiGateway
+    Description: Enter LogType.
+    ConstraintDescription: Must specify LogType.
+
+  EMRClusterId:
+    Type: String
+    Description: Enter LogAggregator EMRClusterId .
+    ConstraintDescription: Enter LogAggregator EMRClusterId.
+
+#  LogS3Destination:
+#    Type: String
+#    Description: Enter LogAggregator Log S3 Destination .
+#    ConstraintDescription: Enter LogAggregator Log S3 Destination.
+#    Default: ""
+
+  LogESDestination:
+    Type: String
+    Description: Enter LogAggregator Log ES Destination .
+    ConstraintDescription: Enter LogAggregator Log ES Destination.
+
+  SourceCodeBucket:
+    Type: String
+    Description: Enter LogAggregator SourceCodeBucket .
+    ConstraintDescription: Enter LogAggregator SourceCodeBucket.
+
+  SourceCodePrefix:
+    Type: String
+    Description: Enter LogAggregator Version .
+    ConstraintDescription: Enter LogAggregator Version.
+
+  ConfigTable:
+    Type: String
+    Description: Enter LogAggregator JobConfigTable .
+    ConstraintDescription: Enter LogAggregator JobConfigTable.
+
+  ESSecretName:
+    Type: String
+    Description: Enter LogAggregator Elastic SecretName .
+    ConstraintDescription: Enter LogAggregator JobConfigTable.
+
+  RegionName:
+    Type: String
+    Description: Enter LogAggregator JobConfigTable .
+    ConstraintDescription: Enter LogAggregator JobConfigTable.
+
+  LogSourceType:
+    Type: String
+    Description: Enter Logs soruce type like S3 or cloudwatch, Kinesis .
+    ConstraintDescription: Enter LogAggregator JobConfigTable.
+    AllowedValues:
+      - S3
+      - CloudWatch
+      - Kinesis
+  Topic:
+    Type: String
+    Description: Topic ARN to send Notification.
+    ConstraintDescription: Enter Topic ARN.
+
+Conditions:
+  IsCloudWatch: !Equals
+    - !Ref LogSourceType
+    - 'CloudWatch'
+
+
+Resources:
+  StreamLogsSubscriptionFilter:
+    Condition: IsCloudWatch
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: !Sub '${LogsStream.Arn}'
+      FilterPattern: ""
+      LogGroupName: !Ref LogSource
+      RoleArn: !Sub '${LogsStreamRole.Arn}'
+
+  LogsStream:
+    Condition: IsCloudWatch
+    Type: AWS::Kinesis::Stream
+    Properties:
+      RetentionPeriodHours: 168
+      ShardCount: 3
+      #      StreamEncryption:
+      #        EncryptionType: KMS
+      #        KeyId: !Ref myKey
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+
+  LogsStreamRole:
+    Condition: IsCloudWatch
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !Sub "logs.${AWS::Region}.amazonaws.com"
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'kinesis:PutRecord'
+                  - 'kinesis:PutRecords'
+                Resource: !Sub 'arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/*'
+
+      Tags:
+        - Key: Name
+          Value: AWSLogAggregator
+        - Key: StackId
+          Value: !Sub '${AWS::StackName}'
+
+  logs:
+    Type: 'Custom::GenerateConfig'
+    Version: 1
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:LogAggregatorLambda"
+      EMRClusterId: !Ref EMRClusterId
+      LogSource: !If [IsCloudWatch, !Ref LogsStream , !Ref LogSource]
+      LogType: !Ref LogType
+      LogESDestination: !Ref LogESDestination
+#      LogS3Destination: !Ref LogS3Destination
+      SourceCodeBucket: !Ref SourceCodeBucket
+      SourceCodePrefix: !Ref SourceCodePrefix
+      ConfigTable: !Ref ConfigTable
+      ESSecretName: !Ref ESSecretName
+      LogSourceType: !Ref LogSourceType
+      RegionName: !Ref RegionName
+      Topic: !Ref Topic
+      EndpointUrl: !Sub "https://kinesis.${RegionName}.amazonaws.com"
+
+
+
+
+
+

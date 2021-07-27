@@ -1,0 +1,442 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Log Aggregator Solution, VPC template (Version v0.0.1)'
+Parameters:
+  VpcCIDR:
+    Type: String
+  PublicSubnet1CIDR:
+    Type: String
+  PublicSubnet2CIDR:
+    Type: String
+  PrivateSubnet1CIDR:
+    Type: String
+  PrivateSubnet2CIDR:
+    Type: String
+Resources:
+  # First, a VPC:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-VPC
+
+  # Our VPC will need internet access:      
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    DependsOn: InternetGateway
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # 2 public and 2 private:
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs ]    # Get the first AZ in the list        
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Public-A
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs ]    # Get the second AZ in the list
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Public-B
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      AvailabilityZone: !Select [ 0, !GetAZs ]    # Get the first AZ in the list
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Private-A
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      AvailabilityZone: !Select [ 1, !GetAZs ]    # Get the second AZ in the list
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Private-B
+
+  # Some route tables for our subnets:
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Public
+  PublicRoute1:   # Public route table has direct routing to IGW:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # Here is a private route table:
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    DependsOn: AttachGateway
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Private
+  PrivateRoute1:            # Private route table can access web via NAT (created below)
+    Type: AWS::EC2::Route
+    DependsOn:
+      - AttachGateway
+      - NATGateway
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+
+  # Attach the public subnets to public route tables,
+  # and attach the private subnets to private route tables:
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  # A NAT Gateway
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt ElasticIPAddress.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+      - Key: Name
+        Value: !Sub NAT-${AWS::StackName}
+  ElasticIPAddress:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: VPC
+  # A security group
+  EMRSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: AttachGateway
+    Properties:
+      GroupName: !Sub LogAggregatorSecurityGroup-${AWS::StackName}
+      GroupDescription: Enable required access to EMR
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '0'
+        ToPort: '1024'
+        CidrIp: !GetAtt VPC.CidrBlock
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: '0'
+        ToPort: '65535'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: udp
+        FromPort: '0'
+        ToPort: '65535'
+        CidrIp: 0.0.0.0/0
+        # A security group
+
+  ElasticMapReduceMasterPrivate:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub 'LogAggregatorEMRMasterSecurityGroup-${AWS::StackName}'
+      GroupDescription: Enable required access to EMR
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          SourceSecurityGroupId: !GetAtt
+            - ElasticMapReduceSlavePrivate
+            - GroupId
+        - IpProtocol: udp
+          FromPort: 0
+          ToPort: 65535
+          SourceSecurityGroupId: !GetAtt
+            - ElasticMapReduceSlavePrivate
+            - GroupId
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          SourceSecurityGroupId: !GetAtt
+            - ElasticMapReduceSlavePrivate
+            - GroupId
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          SourceSecurityGroupId: !GetAtt
+            - ElasticMapReduceServiceAccess
+            - GroupId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+  ElasticMapReduceMasterPrivateIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceMasterPrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+  ElasticMapReduceMasterPrivateIngress1:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceMasterPrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+
+  ElasticMapReduceMasterPrivateIngress2:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceMasterPrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+  ElasticMapReduceSlavePrivate:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub 'LogAggregatorEMRSlaveSecurityGroup-${AWS::StackName}'
+      GroupDescription: Enable required access to EMR
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          SourceSecurityGroupId: !GetAtt
+            - ElasticMapReduceServiceAccess
+            - GroupId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+
+  ElasticMapReduceSlavePrivateIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceSlavePrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+
+  ElasticMapReduceSlavePrivateIngress1:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceSlavePrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+
+  ElasticMapReduceSlavePrivateIngress2:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceSlavePrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+
+  ElasticMapReduceSlavePrivateIngress3:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceSlavePrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+
+  ElasticMapReduceSlavePrivateIngress4:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceSlavePrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+      IpProtocol: udp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+
+  ElasticMapReduceSlavePrivateIngress5:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceSlavePrivate
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+
+  ElasticMapReduceServiceAccess:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub 'LogAggregatorEMRServiceAccess-${AWS::StackName}'
+      GroupDescription: Enable required access to EMR
+      VpcId: !Ref VPC
+  ElasticMapReduceServiceAccessIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: ElasticMapReduceServiceAccess
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceServiceAccess
+        - GroupId
+      IpProtocol: tcp
+      FromPort: 9443
+      ToPort: 9443
+      SourceSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+
+  ElasticMapReduceServiceAccessIngress0:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    DependsOn: ElasticMapReduceServiceAccess
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceServiceAccess
+        - GroupId
+      IpProtocol: tcp
+      FromPort: 8443
+      ToPort: 8443
+      DestinationSecurityGroupId: !GetAtt
+        - ElasticMapReduceSlavePrivate
+        - GroupId
+  ElasticMapReduceServiceAccessEgress:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    DependsOn: ElasticMapReduceServiceAccess
+    Properties:
+      GroupId: !GetAtt
+        - ElasticMapReduceServiceAccess
+        - GroupId
+      IpProtocol: tcp
+      FromPort: 8443
+      ToPort: 8443
+      DestinationSecurityGroupId: !GetAtt
+        - ElasticMapReduceMasterPrivate
+        - GroupId
+Outputs:
+  VPC:
+    Description: VPC of the base network
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${AWS::StackName}-VPC
+  PublicSubnetA:
+    Description: First Public Subnet
+    Value: !Ref PublicSubnetA
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnetA
+  PublicSubnetB:
+    Description: Second Public Subnet
+    Value: !Ref PublicSubnetB
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnetB
+  PrivateSubnetA:
+    Description: First Private Subnet
+    Value: !Ref PrivateSubnetA
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnetA
+  PrivateSubnetB:
+    Description: Second Private Subnet
+    Value: !Ref PrivateSubnetB
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnetB
+  SecurityGroup:
+    Description: ES Security Group
+    Value: !Ref EMRSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-EMRSecurityGroup
+  ElasticMapReduceMasterPrivate:
+    Description: ES Security Group
+    Value: !Ref ElasticMapReduceMasterPrivate
+    Export:
+      Name: !Sub ${AWS::StackName}-ElasticMapReduceMasterPrivate
+  ElasticMapReduceSlavePrivate:
+    Description: ES Security Group
+    Value: !Ref ElasticMapReduceSlavePrivate
+    Export:
+      Name: !Sub ${AWS::StackName}-ElasticMapReduceSlavePrivate
+  ElasticMapReduceServiceAccess:
+    Description: ES Security Group
+    Value: !Ref ElasticMapReduceServiceAccess
+    Export:
+      Name: !Sub ${AWS::StackName}-ElasticMapReduceServiceAccess
