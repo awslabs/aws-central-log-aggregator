@@ -4,7 +4,7 @@ read -p "Enter Bucket Name to sync with or just press enter to build only: " BUC
 
 if [ "$BUCKET_NAME" != "" ]; then
   echo "All code will be sync to bucket $BUCKET_NAME."
-
+fi
 
 # What container is used to install dependencies, must have pip installed
 CONTAINER="python:3"
