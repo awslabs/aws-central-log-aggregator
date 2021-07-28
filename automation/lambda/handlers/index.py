@@ -341,7 +341,7 @@ def send(event, context, response_status, response_data, physical_resource_id=No
 
     try:
         response = http.request('PUT', responseUrl, headers=headers, body=json_response_body)
-        logger.info("Status code:", response.status)
+        logger.info(f"Status code: {response.status}")
     except Exception as e:
         logger.info("send(..) failed executing http.request(..):", e)
 

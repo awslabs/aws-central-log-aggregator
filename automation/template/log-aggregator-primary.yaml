@@ -72,6 +72,14 @@ Parameters:
     Type: String
     Default: logaggregator
 
+  DeployNginx:
+    Description: Do you want deploy Nginx to access Elastic Search from public network?
+    Type: String
+    Default: 'Yes'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+
   ESSecretName:
     Type: String
     Description: Secrets Name.
@@ -162,6 +170,7 @@ Metadata:
           - ESDomainName
           - AdminEmail
           - ClusterSize
+          - DeployNginx
       - Label:
           default: Configuration
         Parameters:
@@ -230,6 +239,9 @@ Conditions:
   IsUltraWarmEnabled: !Equals
     - !Ref EnabledUltraWarm
     - 'Yes'
+  IsDeployNginx: !Equals
+    - !Ref DeployNginx
+    - 'Yes'
 Resources:
   VPCStack:
     Type: 'AWS::CloudFormation::Stack'
@@ -251,6 +263,7 @@ Resources:
     DependsOn:
       - ElasticsearchAWSLogs
     Type: 'AWS::CloudFormation::Stack'
+    Condition: IsDeployNginx
     Properties:
       Parameters:
         ESDomin: !Sub '${ElasticsearchAWSLogs.DomainEndpoint}'
@@ -456,6 +469,19 @@ Resources:
           Value: AWSLogAggregator
         - Key: StackId
           Value: !Sub '${AWS::StackName}'
+
+  # Lambda Security Group
+  LambdaSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allows HTTP
+      VpcId: !GetAtt VPCStack.Outputs.VPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 443
+          ToPort: 443
+          IpProtocol: tcp
+
   AggregatorLambda:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -478,6 +504,13 @@ Resources:
           Value: AWSLogAggregator
         - Key: StackId
           Value: !Sub '${AWS::StackName}'
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !GetAtt VPCStack.Outputs.PrivateSubnetA
+          - !GetAtt VPCStack.Outputs.PrivateSubnetB
+
   AggregatorLambdaRole:
     Type: 'AWS::IAM::Role'
     DependsOn: ElasticsearchAWSLogs
@@ -496,6 +529,8 @@ Resources:
                 - lambda.amazonaws.com
             Action:
               - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
       Path: /
       Policies:
         - PolicyName: root
@@ -607,6 +642,8 @@ Resources:
           SSM_PATH: !Ref ESSecretName
       Handler: ultrawarm.lambda_handler
       Runtime: python3.8
+      Layers:
+        - !Ref LambdaLayer
       Timeout: 600
       Role: !GetAtt
         - AggregatorLambdaRole
@@ -619,6 +656,12 @@ Resources:
           Value: AWSLogAggregator
         - Key: StackId
           Value: !Sub '${AWS::StackName}'
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !GetAtt VPCStack.Outputs.PrivateSubnetA
+          - !GetAtt VPCStack.Outputs.PrivateSubnetB
 
   UltrawarmEventsRule:
     Condition: IsUltraWarmEnabled
@@ -630,6 +673,19 @@ Resources:
       Targets:
         - Id: 'UltrawarmTargetId'
           Arn: !Sub '${UltrawarmLambda.Arn}'
+
+  LambdaLayer:
+    Condition: IsUltraWarmEnabled
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - python3.8
+        - python3.7
+        - python3.6
+      Content:
+        S3Bucket: !Ref SourceCodeBucket
+        S3Key: !Sub '${Version}/lambda_layer/lambda_layer.zip'
+      LayerName: ultra-warm-layer
 
   PermissionForEventsToInvokeLambda:
     Condition: IsUltraWarmEnabled

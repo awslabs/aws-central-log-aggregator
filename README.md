@@ -11,6 +11,8 @@ A cloud-scale logging solution on the AWS platform in order to support proactive
 
 ## Design
 
+![Architecture](/doc/AWS-log-agg.png)
+
 - Log Ingestion and Processing:
 Proposed/Implemented architecture/Framework leverages EMR/Spark/Spark Streaming to create a unified ETL approach for extracting log data from various log sources both in batch and streaming mode, transform and persist the data into sink Elastic Search. 
 
@@ -55,8 +57,6 @@ You can rapidly create dashboards that pull together charts, maps, and filters t
 - Alerting- Easy to build alerts that trigger custom actions
 
 
-
-**[��‍Solution Landing Page](https://w.amazon.com/bin/view/AWS/Teams/Proserve/GCCI/Offerings/Central_Log_Aggregator/)** | **[� Feature request](https://gitlab.aws.dev/wwco-proserve-gcci/offerings/aws-log-aggregator/-/issues/new?assignees=&labels=feature-request%2C+enhancement&template=feature_request.md&title=)** | **[� Bug Report](https://gitlab.aws.dev/wwco-proserve-gcci/offerings/aws-log-aggregator/-/issues/new?assignees=&labels=bug%2C+triage&template=bug_report.md&title=)** | **[� Documentation Improvement](https://gitlab.aws.dev/wwco-proserve-gcci/offerings/aws-log-aggregator/-/issues/new?assignees=&labels=document-update&template=documentation_improvements.md&title=)**
 
 ## Table of content
 
