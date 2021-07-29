@@ -232,7 +232,7 @@ def handler(event, context):
         return None
 
     send(event, context, response_data["Status"], response_data,
-         physicalResourceId=response_data["CustomResourcePhysicalID"])
+         physical_resource_id=response_data["CustomResourcePhysicalID"])
 
 
 def prepare_log_config(event):
