@@ -84,7 +84,7 @@
         <dependency>
             <groupId>commons-lang</groupId>
             <artifactId>commons-lang</artifactId>
-            <version>2.3</version>
+            <version>2.6</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -636,7 +636,7 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>amazon-kinesis-client</artifactId>
-            <version>1.7.3</version>
+            <version>1.14.7</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -728,7 +728,7 @@
         <dependency>
             <groupId>com.amazon.redshift</groupId>
             <artifactId>redshift-jdbc42</artifactId>
-            <version>1.2.41.1065</version>
+            <version>2.1.0.4</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -820,7 +820,7 @@
         <dependency>
             <groupId>com.amazon.emr</groupId>
             <artifactId>emr-dynamodb-hadoop</artifactId>
-            <version>4.12.0</version>
+            <version>4.16.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -913,7 +913,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
             <exclusions>
                 <exclusion>
                     <artifactId>jetty</artifactId>
@@ -1004,7 +1004,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
 
             <exclusions>
                 <exclusion>
@@ -1096,7 +1096,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-streaming_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
 
             <exclusions>
                 <exclusion>
@@ -1188,7 +1188,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-streaming-kinesis-asl_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1280,7 +1280,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-streaming-kafka-0-10_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1372,7 +1372,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql-kafka-0-10_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1464,7 +1464,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-avro_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1556,7 +1556,7 @@
         <dependency>
             <groupId>com.squareup.retrofit2</groupId>
             <artifactId>converter-moshi</artifactId>
-            <version>2.5.0</version>
+            <version>2.9.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1648,7 +1648,7 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>logging-interceptor</artifactId>
-            <version>3.11.0</version>
+            <version>5.0.0-alpha.4</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1740,7 +1740,7 @@
         <dependency>
             <groupId>com.squareup.moshi</groupId>
             <artifactId>moshi</artifactId>
-            <version>1.5.0</version>
+            <version>1.13.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1832,7 +1832,7 @@
         <dependency>
             <groupId>com.squareup.okio</groupId>
             <artifactId>okio</artifactId>
-            <version>1.14.0</version>
+            <version>3.0.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -1924,7 +1924,7 @@
         <dependency>
             <groupId>com.squareup.retrofit2</groupId>
             <artifactId>retrofit</artifactId>
-            <version>2.5.0</version>
+            <version>2.9.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2016,7 +2016,7 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
-            <version>3.11.0</version>
+            <version>5.0.0-alpha.4</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2108,7 +2108,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-cbor</artifactId>
-            <version>2.10.3</version>
+            <version>2.13.1</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2200,7 +2200,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.10.3</version>
+            <version>2.13.1</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2292,7 +2292,7 @@
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-spark_2.11</artifactId>
-            <version>0.5.2-incubating</version>
+            <version>0.10.1</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2384,7 +2384,7 @@
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-avro</artifactId>
-            <version>1.10.1</version>
+            <version>1.12.2</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2476,7 +2476,7 @@
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
-            <version>2.4.0</version>
+            <version>3.1.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2568,7 +2568,7 @@
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-core_2.11</artifactId>
-            <version>0.5.0</version>
+            <version>0.6.1</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2844,7 +2844,7 @@
         <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch-spark-20_2.11</artifactId>
-            <version>7.7.0</version>
+            <version>8.0.0-rc1</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -2936,7 +2936,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.2.5</version>
+            <version>42.3.2</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -3028,7 +3028,7 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>3.2.0</version>
+            <version>5.0.1</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -3120,7 +3120,7 @@
         <dependency>
             <groupId>org.msgpack</groupId>
             <artifactId>msgpack-core</artifactId>
-            <version>0.8.16</version>
+            <version>0.9.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -3212,7 +3212,7 @@
         <dependency>
             <groupId>org.influxdb</groupId>
             <artifactId>influxdb-java</artifactId>
-            <version>2.15</version>
+            <version>2.22</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -3319,7 +3319,7 @@
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.19</version>
+            <version>8.0.28</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
@@ -3339,27 +3339,27 @@
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.8.5</version>
+            <version>2.8.9</version>
         </dependency>
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20190722</version>
+            <version>20211205</version>
         </dependency>
         <dependency>
             <groupId>org.apache.tinkerpop</groupId>
             <artifactId>gremlin-driver</artifactId>
-            <version>3.4.1</version>
+            <version>3.5.2</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
-            <version>1.8</version>
+            <version>1.9</version>
         </dependency>
         <dependency>
             <groupId>com.sap.cloud.db.jdbc</groupId>
             <artifactId>ngdbc</artifactId>
-            <version>2.4.76</version>
+            <version>2.11.14</version>
         </dependency>
         <dependency>
             <groupId>com.databricks</groupId>
@@ -3369,7 +3369,7 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-encryption-sdk-java</artifactId>
-            <version>2.2.0</version>
+            <version>2.3.3</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-secretsmanager -->
         <dependency>
@@ -3380,7 +3380,7 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-hive_2.11</artifactId>
-            <version>2.4.4</version>
+            <version>2.4.8</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
