@@ -276,7 +276,7 @@ public class StreamLogProcessor extends BaseLogProcessor {
 
                 Seq renamedStructCols_seq = JavaConverters.collectionAsScalaIterableConverter(renamedStrutctCols).asScala().toSeq();
 
-                Dataset ds_struct = ds.toDF().select(renamedStructCols_seq);
+                Dataset ds_struct = ds.toDF().select((Column)renamedStructCols_seq);
                 return flattendf(ds_struct);
             } else {
 
